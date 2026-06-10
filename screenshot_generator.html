@@ -1,0 +1,891 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>資産形成シミュレーター - ストア用スクリーンショットジェネレーター</title>
+  
+  <!-- html2canvas CDN -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+
+  <style>
+    :root {
+      --color-bg-dark: #0D1F2D;
+      --color-accent: #00CED1;
+      --color-accent-dark: #009EA1;
+      --color-accent-light: #E0FAFB;
+      --color-text-light: #FFFFFF;
+      --color-text-dark: #0D1F2D;
+      --color-text-sec: #4A6572;
+      --color-text-muted: #9AABB5;
+      --color-border: #E8F5F5;
+      --color-card-bg: #FFFFFF;
+      --color-app-bg: #F7FFFE;
+    }
+
+    body {
+      margin: 0;
+      padding: 0;
+      /* 外部フォント（Google Fonts）のCORSエラーによるダウンロードエラーを防ぐため、システムフォントのみを使用 */
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans JP", "Hiragino Kaku Gothic ProN", "Meiryo", sans-serif;
+      background-color: #121820;
+      color: #e0e6ed;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      min-height: 100vh;
+    }
+
+    header {
+      width: 100%;
+      max-width: 1200px;
+      padding: 30px 20px 10px 20px;
+      box-sizing: border-box;
+      text-align: center;
+      border-bottom: 1px solid #1f2937;
+    }
+
+    header h1 {
+      margin: 0 0 10px 0;
+      font-size: 28px;
+      color: var(--color-accent);
+      font-weight: 900;
+    }
+
+    header p {
+      margin: 0;
+      font-size: 14px;
+      color: #9ca3af;
+    }
+
+    /* コントロールエリア */
+    .controls {
+      display: flex;
+      gap: 15px;
+      margin: 25px 0;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+
+    .btn {
+      background-color: #1f2937;
+      color: #f3f4f6;
+      border: 1px solid #374151;
+      padding: 10px 20px;
+      font-size: 14px;
+      font-weight: bold;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .btn:hover {
+      background-color: #374151;
+      border-color: #4b5563;
+    }
+
+    .btn.active {
+      background-color: var(--color-accent);
+      color: var(--color-text-dark);
+      border-color: var(--color-accent);
+    }
+
+    .btn-download-all {
+      background-color: #22c55e;
+      color: white;
+      border-color: #22c55e;
+    }
+
+    .btn-download-all:hover {
+      background-color: #16a34a;
+      border-color: #16a34a;
+    }
+
+    /* プレビューコンテナ */
+    .preview-container {
+      display: flex;
+      gap: 40px;
+      padding: 20px;
+      overflow-x: auto;
+      max-width: 100%;
+      box-sizing: border-box;
+      align-items: flex-start;
+    }
+
+    /* スクリーンショット実寸大のラッパー */
+    /* 画面上では CSS transform で縮小表示する */
+    .screenshot-wrapper {
+      position: relative;
+      flex-shrink: 0;
+      background: radial-gradient(circle at 50% 30%, #153c44 0%, var(--color-bg-dark) 80%);
+      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+      border: 1px solid #1f2937;
+      border-radius: 40px;
+      overflow: hidden;
+      transform-origin: top left;
+      margin-bottom: 20px;
+      transition: transform 0.2s ease;
+    }
+
+    /* iPhone 6.7インチ (1290 x 2796) 用 */
+    .size-6-7 {
+      width: 1290px;
+      height: 2796px;
+      transform: scale(0.28); /* 画面上で見やすいように縮小 */
+    }
+
+    /* iPhone 6.5インチ (1242 x 2688) 用 */
+    .size-6-5 {
+      width: 1242px;
+      height: 2688px;
+      transform: scale(0.28);
+    }
+
+    /* 縮小表示による余白を打ち消すためのコンテナ */
+    .scale-box {
+      width: 362px; /* 1290 * 0.28 */
+      height: 785px; /* 2796 * 0.28 */
+      position: relative;
+      flex-shrink: 0;
+    }
+
+    .scale-box.size-6-5-box {
+      width: 348px; /* 1242 * 0.28 */
+      height: 753px; /* 2688 * 0.28 */
+    }
+
+    /* ── スクリーンショット内部のレイアウト ── */
+    .ss-content {
+      width: 100%;
+      height: 100%;
+      position: absolute;
+      top: 0;
+      left: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 120px 80px 0 80px;
+      box-sizing: border-box;
+    }
+
+    /* キャッチコピー */
+    .ss-header {
+      text-align: center;
+      width: 100%;
+      margin-bottom: 80px;
+    }
+
+    .ss-header h2 {
+      font-size: 72px;
+      font-weight: 900;
+      color: var(--color-text-light);
+      margin: 0 0 20px 0;
+      line-height: 1.3;
+      letter-spacing: -0.02em;
+      text-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+    }
+
+    .ss-header p {
+      font-size: 38px;
+      font-weight: 700;
+      color: var(--color-accent);
+      margin: 0;
+      line-height: 1.4;
+    }
+
+    /* iPhoneデバイスフレーム */
+    .phone-frame {
+      width: 900px;
+      height: 1850px;
+      background-color: #1a1a1a;
+      border: 24px solid #333333;
+      border-radius: 90px;
+      box-shadow: 0 50px 100px -20px rgba(0, 0, 0, 0.8),
+                  inset 0 0 15px rgba(255,255,255,0.1);
+      position: relative;
+      overflow: hidden;
+      box-sizing: border-box;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* ダイナミックアイランド */
+    .dynamic-island {
+      position: absolute;
+      top: 25px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 260px;
+      height: 60px;
+      background-color: #000000;
+      border-radius: 30px;
+      z-index: 100;
+    }
+
+    /* ステータスバーのダミー */
+    .status-bar {
+      height: 90px;
+      width: 100%;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 30px 70px 0 70px;
+      box-sizing: border-box;
+      color: #000000;
+      font-weight: 700;
+      font-size: 26px;
+      z-index: 10;
+      background-color: var(--color-app-bg);
+    }
+
+    /* アプリ内部画面のモックアップ */
+    .app-screen {
+      flex: 1;
+      background-color: var(--color-app-bg);
+      padding: 20px 45px 0 45px;
+      box-sizing: border-box;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    /* モックアップヘッダー */
+    .app-header {
+      margin-bottom: 40px;
+    }
+
+    .app-header h3 {
+      font-size: 46px;
+      font-weight: 900;
+      color: var(--color-text-dark);
+      margin: 0 0 10px 0;
+    }
+
+    .app-header p {
+      font-size: 24px;
+      color: var(--color-text-sec);
+      margin: 0;
+    }
+
+    /* モックアップカード */
+    .app-card {
+      background-color: var(--color-card-bg);
+      border-radius: 40px;
+      padding: 40px;
+      margin-bottom: 35px;
+      border: 3px solid var(--color-border);
+      box-shadow: 0 10px 30px rgba(0, 206, 209, 0.05);
+    }
+
+    /* 横並びの入力項目 */
+    .app-row {
+      display: flex;
+      gap: 30px;
+      margin-bottom: 30px;
+    }
+
+    .app-col {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .app-label {
+      font-size: 24px;
+      font-weight: 700;
+      color: var(--color-text-sec);
+      margin-bottom: 12px;
+    }
+
+    .app-input {
+      background-color: var(--color-app-bg);
+      border-radius: 20px;
+      border: 3px solid var(--color-border);
+      padding: 24px 30px;
+      font-size: 32px;
+      font-weight: 700;
+      color: var(--color-text-dark);
+    }
+
+    /* 頻度や投資先のプリセットボタングループ */
+    .app-buttons {
+      display: flex;
+      gap: 15px;
+      margin-top: 10px;
+    }
+
+    .app-btn-select {
+      flex: 1;
+      padding: 20px 10px;
+      border: 3px solid var(--color-border);
+      border-radius: 20px;
+      background-color: var(--color-app-bg);
+      text-align: center;
+      font-size: 22px;
+      font-weight: 700;
+      color: var(--color-text-sec);
+    }
+
+    .app-btn-select.selected {
+      border-color: var(--color-accent);
+      background-color: var(--color-accent-light);
+      color: var(--color-accent-dark);
+    }
+
+    .app-btn-select-preset {
+      flex: 1;
+      padding: 20px 10px;
+      border: 3px solid var(--color-border);
+      border-radius: 20px;
+      background-color: var(--color-app-bg);
+      text-align: center;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    .app-btn-select-preset.selected {
+      border-color: var(--color-accent);
+      background-color: var(--color-accent-light);
+    }
+
+    .preset-emoji {
+      font-size: 36px;
+      margin-bottom: 8px;
+    }
+
+    .preset-title {
+      font-size: 20px;
+      font-weight: 700;
+      color: var(--color-text-dark);
+    }
+
+    .preset-rate {
+      font-size: 18px;
+      color: var(--color-text-sec);
+      margin-top: 4px;
+    }
+
+    .preset-rate.selected {
+      color: var(--color-accent-dark);
+      font-weight: bold;
+    }
+
+    /* アクションボタン */
+    .app-action-btn {
+      background-color: var(--color-accent);
+      color: var(--color-text-light);
+      border-radius: 9999px;
+      padding: 30px;
+      font-size: 32px;
+      font-weight: 900;
+      text-align: center;
+      box-shadow: 0 10px 25px rgba(0, 206, 209, 0.3);
+      margin-top: 10px;
+    }
+
+    /* 結果カード (プレミアムカード) */
+    .result-card {
+      background: linear-gradient(135deg, #00ced1 0%, #009ea1 100%);
+      border-radius: 40px;
+      padding: 45px;
+      color: var(--color-text-light);
+      margin-top: 35px;
+      box-shadow: 0 20px 40px rgba(0, 206, 209, 0.25);
+    }
+
+    .result-header {
+      font-size: 26px;
+      font-weight: 700;
+      opacity: 0.9;
+      margin-bottom: 10px;
+    }
+
+    .result-amount {
+      font-size: 76px;
+      font-weight: 900;
+      margin-bottom: 25px;
+      letter-spacing: -1px;
+    }
+
+    .result-details {
+      display: flex;
+      border-top: 2px solid rgba(255, 255, 255, 0.2);
+      padding-top: 25px;
+      gap: 20px;
+    }
+
+    .result-detail-item {
+      flex: 1;
+    }
+
+    .result-detail-label {
+      font-size: 20px;
+      opacity: 0.8;
+      margin-bottom: 5px;
+    }
+
+    .result-detail-val {
+      font-size: 34px;
+      font-weight: 700;
+    }
+
+    /* 履歴リストアイテム */
+    .history-item {
+      background-color: var(--color-card-bg);
+      border: 3px solid var(--color-border);
+      border-radius: 30px;
+      padding: 30px 35px;
+      margin-bottom: 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .history-left {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .history-title {
+      font-size: 28px;
+      font-weight: 700;
+      color: var(--color-text-dark);
+    }
+
+    .history-meta {
+      font-size: 20px;
+      color: var(--color-text-sec);
+    }
+
+    .history-right {
+      text-align: right;
+    }
+
+    .history-result {
+      font-size: 38px;
+      font-weight: 900;
+      color: var(--color-accent-dark);
+    }
+
+    .history-gain {
+      font-size: 20px;
+      color: #2ecc71;
+      font-weight: 700;
+      margin-top: 4px;
+    }
+
+    /* 履歴画面の背景スクロール風 */
+    .history-container {
+      display: flex;
+      flex-direction: column;
+      padding-top: 10px;
+    }
+
+    .home-indicator {
+      position: absolute;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 320px;
+      height: 12px;
+      background-color: #000000;
+      border-radius: 6px;
+    }
+
+    /* アクションボタン（ダウンロード個別用） */
+    .download-panel {
+      text-align: center;
+      margin-top: 15px;
+    }
+
+    /* 注意書き */
+    .warning-text {
+      background-color: #2a1b1b;
+      border: 1px solid #ff4a4a;
+      color: #ffbaba;
+      padding: 15px;
+      border-radius: 8px;
+      max-width: 1200px;
+      margin: 10px auto;
+      font-size: 14px;
+      text-align: left;
+      box-sizing: border-box;
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <h1>資産形成シミュレーター - ストア用スクリーンショット</h1>
+    <p>
+      iPhone 6.7インチおよび6.5インチのサイズに対応した高解像度画像を出力します。
+    </p>
+  </header>
+
+  <div class="warning-text">
+    <strong>⚠️ 画像のダウンロードが動かない場合:</strong><br>
+    1. ローカルファイル制限のため、ブラウザによっては「一括ダウンロード」がポップアップブロックされることがあります。その場合は、各画像の下にある<strong>個別ダウンロードボタン</strong>をご使用ください。<br>
+    2. ダウンロードされた画像が保存されない場合、ブラウザの「自動ダウンロードの許可」を有効にしてください。
+  </div>
+
+  <div class="controls">
+    <button class="btn active" onclick="switchSize('6.7')">iPhone 6.7インチ（15 Pro Max等）</button>
+    <button class="btn" onclick="switchSize('6.5')">iPhone 6.5インチ（11 Pro Max等）</button>
+    <button class="btn btn-download-all" onclick="downloadAll()">一括ダウンロード</button>
+  </div>
+
+  <div class="preview-container">
+    
+    <!-- ── スクリーンショット 1 ── -->
+    <div>
+      <div id="wrapper-1" class="screenshot-wrapper size-6-7">
+        <div class="ss-content">
+          <div class="ss-header">
+            <h2>日々の節約を、未来の資産に。</h2>
+            <p>もし毎日 500円 節約してオルカンに投資したら？</p>
+          </div>
+          
+          <div class="phone-frame">
+            <div class="dynamic-island"></div>
+            <div class="status-bar">
+              <span>9:41</span>
+              <span>🔋 📶 📶</span>
+            </div>
+            
+            <div class="app-screen">
+              <div class="app-header">
+                <h3>資産形成シミュレーター</h3>
+                <p>節約したお金を投資したら将来いくらになる？</p>
+              </div>
+              
+              <div class="app-card">
+                <div class="app-row">
+                  <div class="app-col">
+                    <span class="app-label">💴 積立額（円）</span>
+                    <div class="app-input">500</div>
+                  </div>
+                  <div class="app-col">
+                    <span class="app-label">📅 運用年数（年）</span>
+                    <div class="app-input">20</div>
+                  </div>
+                </div>
+                
+                <span class="app-label">🔄 積立頻度</span>
+                <div class="app-buttons">
+                  <div class="app-btn-select">毎月</div>
+                  <div class="app-btn-select">毎週</div>
+                  <div class="app-btn-select selected">毎日</div>
+                  <div class="app-btn-select">一括</div>
+                </div>
+                
+                <span class="app-label" style="display: block; margin-top: 30px;">🏦 NISA（投資先を選択）</span>
+                <div class="app-buttons">
+                  <div class="app-btn-select-preset">
+                    <span class="preset-emoji">🇺🇸</span>
+                    <span class="preset-title">米国株</span>
+                    <span class="preset-rate">7.0%</span>
+                  </div>
+                  <div class="app-btn-select-preset selected">
+                    <span class="preset-emoji">🌐</span>
+                    <span class="preset-title">世界株</span>
+                    <span class="preset-rate selected">7.2%</span>
+                  </div>
+                  <div class="app-btn-select-preset">
+                    <span class="preset-emoji">🇯🇵</span>
+                    <span class="preset-title">日本株</span>
+                    <span class="preset-rate">5.0%</span>
+                  </div>
+                </div>
+              </div>
+
+              <div class="result-card">
+                <div class="result-header">20年後のシミュレーション結果</div>
+                <div class="result-amount">¥7,309,567</div>
+                <div class="result-details">
+                  <div class="result-detail-item">
+                    <div class="result-detail-label">元本合計</div>
+                    <div class="result-detail-val">¥3,650,000</div>
+                  </div>
+                  <div class="result-detail-item">
+                    <div class="result-detail-label">運用収益</div>
+                    <div class="result-detail-val">+¥3,659,567</div>
+                  </div>
+                </div>
+              </div>
+
+            </div>
+            
+            <div class="home-indicator"></div>
+          </div>
+        </div>
+      </div>
+      <div class="download-panel">
+        <button class="btn" onclick="downloadSingle(1)">1枚目をダウンロード</button>
+      </div>
+    </div>
+
+    <!-- ── スクリーンショット 2 ── -->
+    <div>
+      <div id="wrapper-2" class="screenshot-wrapper size-6-7">
+        <div class="ss-content">
+          <div class="ss-header">
+            <h2>目標金額から逆算シミュレート！</h2>
+            <p>「将来 2000万円 貯めるには毎月いくら必要？」</p>
+          </div>
+          
+          <div class="phone-frame">
+            <div class="dynamic-island"></div>
+            <div class="status-bar">
+              <span>9:41</span>
+              <span>🔋 📶 📶</span>
+            </div>
+            
+            <div class="app-screen">
+              <div class="app-header">
+                <h3>目標から逆算する</h3>
+                <p>何年でいくら貯めたいかから必要な節約額を計算</p>
+              </div>
+              
+              <div class="app-card">
+                <div class="app-row">
+                  <div class="app-col" style="flex: 1.5;">
+                    <span class="app-label">🎯 目標金額（円）</span>
+                    <div class="app-input">20,000,000</div>
+                  </div>
+                  <div class="app-col" style="flex: 0.8;">
+                    <span class="app-label">📅 期間（年）</span>
+                    <div class="app-input">25</div>
+                  </div>
+                </div>
+                
+                <span class="app-label">📈 想定年利</span>
+                <div class="app-input" style="width: 50%;">7.0 ％</div>
+
+                <div class="app-action-btn" style="margin-top: 30px;">⚙️ 必要積立額を計算する</div>
+              </div>
+
+              <div class="result-card" style="background: linear-gradient(135deg, #2c3e50 0%, #34495e 100%);">
+                <div class="result-header">目標達成に必要な毎月の積立額</div>
+                <div class="result-amount" style="color: var(--color-accent);">¥26,200 / 月</div>
+                <div class="result-details">
+                  <div class="result-detail-item">
+                    <div class="result-detail-label">25年間の積立元本</div>
+                    <div class="result-detail-val">¥7,860,000</div>
+                  </div>
+                  <div class="result-detail-item">
+                    <div class="result-detail-label">必要な運用益</div>
+                    <div class="result-detail-val">¥12,140,000</div>
+                  </div>
+                </div>
+              </div>
+
+            </div>
+            
+            <div class="home-indicator"></div>
+          </div>
+        </div>
+      </div>
+      <div class="download-panel">
+        <button class="btn" onclick="downloadSingle(2)">2枚目をダウンロード</button>
+      </div>
+    </div>
+
+    <!-- ── スクリーンショット 3 ── -->
+    <div>
+      <div id="wrapper-3" class="screenshot-wrapper size-6-7">
+        <div class="ss-content">
+          <div class="ss-header">
+            <h2>シミュレーション履歴を比較</h2>
+            <p>複数の節約・積立プランを並べて最適な選択を</p>
+          </div>
+          
+          <div class="phone-frame">
+            <div class="dynamic-island"></div>
+            <div class="status-bar">
+              <span>9:41</span>
+              <span>🔋 📶 📶</span>
+            </div>
+            
+            <div class="app-screen">
+              <div class="app-header">
+                <h3>シミュレーション履歴</h3>
+                <p>保存された過去の試算データをいつでも確認・比較</p>
+              </div>
+              
+              <div class="history-container">
+                
+                <div class="history-item">
+                  <div class="history-left">
+                    <span class="history-title">🥤 毎日300円節約 (カフェ代)</span>
+                    <span class="history-meta">毎日積立 ・ 30年 ・ 年利 7.0%</span>
+                  </div>
+                  <div class="history-right">
+                    <span class="history-result">¥10,480,951</span>
+                    <div class="history-gain">+¥7,195,951</div>
+                  </div>
+                </div>
+
+                <div class="history-item">
+                  <div class="history-left">
+                    <span class="history-title">🍱 毎週4000円節約 (外食セーブ)</span>
+                    <span class="history-meta">毎週積立 ・ 20年 ・ 年利 7.2%</span>
+                  </div>
+                  <div class="history-right">
+                    <span class="history-result">¥9,451,208</span>
+                    <div class="history-gain">+¥5,291,208</div>
+                  </div>
+                </div>
+
+                <div class="history-item">
+                  <div class="history-left">
+                    <span class="history-title">🚗 毎月3万円節約 (車維持費見直し)</span>
+                    <span class="history-meta">毎月積立 ・ 25年 ・ 年利 7.0%</span>
+                  </div>
+                  <div class="history-right">
+                    <span class="history-result">¥24,300,560</span>
+                    <div class="history-gain">+¥15,300,560</div>
+                  </div>
+                </div>
+
+                <div class="history-item">
+                  <div class="history-left">
+                    <span class="history-title">🏠 月5万円一括節約 (家賃下げる)</span>
+                    <span class="history-meta">毎月積立 ・ 15年 ・ 年利 5.0%</span>
+                  </div>
+                  <div class="history-right">
+                    <span class="history-result">¥13,364,445</span>
+                    <div class="history-gain">+¥4,364,445</div>
+                  </div>
+                </div>
+
+              </div>
+
+            </div>
+            
+            <div class="home-indicator"></div>
+          </div>
+        </div>
+      </div>
+      <div class="download-panel">
+        <button class="btn" onclick="downloadSingle(3)">3枚目をダウンロード</button>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- スケーリング用の余白調整スクリプト -->
+  <script>
+    let currentSize = '6.7';
+
+    // ページロード時に縮小プレビュー表示用のダミーボックスサイズを調整
+    window.onload = function() {
+      applyScalingBoxes();
+    };
+
+    function switchSize(size) {
+      currentSize = size;
+      
+      const buttons = document.querySelectorAll('.controls .btn');
+      buttons.forEach(btn => {
+        if (btn.innerText.includes(size)) {
+          btn.classList.add('active');
+        } else if (!btn.classList.contains('btn-download-all')) {
+          btn.classList.remove('active');
+        }
+      });
+
+      const wrappers = document.querySelectorAll('.screenshot-wrapper');
+      wrappers.forEach(wrap => {
+        wrap.className = 'screenshot-wrapper';
+        if (size === '6.7') {
+          wrap.classList.add('size-6-7');
+        } else {
+          wrap.classList.add('size-6-5');
+        }
+      });
+
+      applyScalingBoxes();
+    }
+
+    function applyScalingBoxes() {
+      // プレビューコンテナ内のダミー高さを調整して、transformによるズレをなくす
+      const scaleBoxes = document.querySelectorAll('.scale-box');
+      scaleBoxes.forEach(box => box.remove());
+
+      const wrappers = document.querySelectorAll('.screenshot-wrapper');
+      wrappers.forEach(wrap => {
+        const box = document.createElement('div');
+        box.className = 'scale-box';
+        if (currentSize === '6.5') {
+          box.classList.add('size-6-5-box');
+        }
+        wrap.parentNode.insertBefore(box, wrap);
+        box.appendChild(wrap);
+      });
+    }
+
+    function getFilename(index) {
+      const sizeName = currentSize === '6.7' ? 'iPhone_6.7inch' : 'iPhone_6.5inch';
+      return `screenshot_${index}_${sizeName}.png`;
+    }
+
+    function downloadSingle(index) {
+      const element = document.getElementById(`wrapper-${index}`);
+      const filename = getFilename(index);
+      
+      // 縮小表示のスタイルを一時的に削除し、等倍（高解像度）に戻す
+      const originalTransform = element.style.transform;
+      const originalMargin = element.style.margin;
+      const originalPosition = element.style.position;
+      
+      element.style.transform = 'none';
+      element.style.margin = '0';
+      element.style.position = 'relative';
+
+      // ブラウザが再レンダリング（Reflow/Repaint）を確実に終えてから html2canvas を実行する
+      setTimeout(() => {
+        html2canvas(element, {
+          scale: 1,
+          useCORS: false, // CORSエラー（特にローカルHTMLでの外部リソース取得）によるクラッシュを防ぐために false に変更
+          backgroundColor: null,
+          logging: true // コンソールにログを出してデバッグしやすくする
+        }).then(canvas => {
+          // キャプチャ完了後、スタイルを元に戻す
+          element.style.transform = '';
+          element.style.margin = '';
+          element.style.position = '';
+          
+          try {
+            const dataUrl = canvas.toDataURL('image/png');
+            const link = document.createElement('a');
+            link.download = filename;
+            link.href = dataUrl;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+          } catch (e) {
+            console.error("DataURLの取得またはダウンロードリンクの生成に失敗しました:", e);
+            alert("画像の保存に失敗しました。ローカルファイルのセキュリティ制限が原因の可能性があります。エラー: " + e.message);
+          }
+        }).catch(err => {
+          // エラー時もスタイルを元に戻す
+          element.style.transform = '';
+          element.style.margin = '';
+          element.style.position = '';
+          console.error("html2canvas 実行エラー:", err);
+          alert("画像のレンダリング中にエラーが発生しました: " + err.message);
+        });
+      }, 150); // 150msの遅延を設けてスタイルの変更を確実に反映させる
+    }
+
+    function downloadAll() {
+      // 複数ファイル自動ダウンロードブロックを考慮し、時間差でダウンロードを実行する
+      alert("一括ダウンロードを開始します。ブラウザから「複数ファイルの自動ダウンロード」許可を求められた場合は、許可をしてください。\nもし動作しない場合は、画像下の個別ダウンロードボタンをご利用ください。");
+      downloadSingle(1);
+      setTimeout(() => downloadSingle(2), 1500); // 1.5秒空ける
+      setTimeout(() => downloadSingle(3), 3000); // 3秒空ける
+    }
+  </script>
+</body>
+</html>
